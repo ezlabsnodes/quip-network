@@ -33,7 +33,7 @@ echo -e "[INFO] Detected Public IPv4: $PUBLIC_IP"
 echo "=========================================="
 
 # ==========================================
-# 2. Setup Dependency (Optimized with Smart Fallback)
+# 2. Setup Dependency
 # ==========================================
 USERNAME=$(whoami)
 ARCH=$(uname -m)
@@ -43,7 +43,6 @@ function info() { echo -e "\033[1;32m[INFO] $1\033[0m"; }
 function warn() { echo -e "\033[1;33m[WARN] $1\033[0m"; }
 function error() { echo -e "\033[1;31m[ERROR] $1\033[0m" >&2; exit 1; }
 
-# Smart install function: mencoba install cepat, jika gagal (404) baru update
 function install_packages() {
     info "Installing packages..."
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$@" || {
@@ -65,7 +64,11 @@ fi
 # Install essential build tools tanpa memaksakan full apt upgrade di awal
 install_packages \
     git clang cmake build-essential openssl pkg-config libssl-dev \
-    openssh-server sed nano automake autoconf nvme-cli libgbm-dev libleveldb-dev bsdmainutils  \
+    wget htop tmux jq make gcc tar ncdu protobuf-compiler \
+    default-jdk aptitude squid apache2-utils file lsof zip unzip \
+    openssh-server sed lz4 aria2 pv \
+    python3 python3-venv python3-pip python3-dev screen snapd flatpak \
+    nano automake autoconf nvme-cli libgbm-dev libleveldb-dev bsdmainutils \
     ca-certificates curl gnupg lsb-release software-properties-common
 
 # Docker Installation
@@ -116,11 +119,30 @@ sed -i "s/node_name = \"my-cpu-node\"/node_name = \"$NODE_NAME\"/g" data/config.
 sed -i "s/secret = \"CHANGE_ME\"/secret = \"$SECRET\"/g" data/config.toml
 sed -i "s/# auto_mine = false/auto_mine = true/g" data/config.toml
 
-# Add public_host below port = 20049 using the strictly grabbed IPv4
+# Add public_host below port = 20049
 sed -i "/port = 20049/a public_host = \"$PUBLIC_IP\"" data/config.toml
 
 info "Setting up .env file..."
 cp env.example .env
+
+# === PERBAIKAN: Konfigurasi agar dashboard bisa diakses dari luar ===
+# 1. Ubah QUIP_HOSTNAME agar Caddy mendengarkan di semua interface di port 20080 (HTTP)
+sed -i 's/^QUIP_HOSTNAME=.*/QUIP_HOSTNAME=:20080/' .env
+
+# 2. Timpa Caddyfile dengan konfigurasi plain HTTP tanpa email / TLS
+info "Fixing Caddyfile for plain HTTP access..."
+cat > caddy/Caddyfile << 'EOF'
+http://:20080 {
+        # Node telemetry / v1 REST
+        handle /api/v1/* {
+                reverse_proxy quip-node:80
+        }
+
+        # Dashboard: /api/telemetry*, /api/health, SPA fallback
+        reverse_proxy quip-dashboard:3001
+}
+EOF
+# =================================================================
 
 # ==========================================
 # 4. Start Node
@@ -133,4 +155,5 @@ echo " Setup Complete! Node is running."
 echo " Node Name   : $NODE_NAME"
 echo " Public IPv4 : $PUBLIC_IP"
 echo " Secret      : $SECRET"
+echo " Dashboard   : http://$PUBLIC_IP:20080"
 echo "=========================================="
