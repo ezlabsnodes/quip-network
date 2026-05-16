@@ -5,7 +5,6 @@ echo "=========================================="
 echo " Quip Network Node Auto Setup"
 echo "=========================================="
 
-# 1. User Inputs
 read -p "Enter node_name (Example: Nodename - 0xethereum): " NODE_NAME
 read -p "Enter secret (Press Enter for fresh setup/auto-generate): " SECRET
 
@@ -61,7 +60,6 @@ if [ "$ARCH" != "x86_64" ]; then
     warn "Non-x86_64 architecture detected ($ARCH), some packages might need adjustment"
 fi
 
-# Install essential build tools tanpa memaksakan full apt upgrade di awal
 install_packages \
     git clang cmake build-essential openssl pkg-config libssl-dev \
     wget htop tmux jq make gcc tar ncdu protobuf-compiler \
@@ -71,7 +69,6 @@ install_packages \
     nano automake autoconf nvme-cli libgbm-dev libleveldb-dev bsdmainutils \
     ca-certificates curl gnupg lsb-release software-properties-common
 
-# Docker Installation
 info "Checking Docker installation..."
 if ! command_exists docker; then
     info "Installing Docker..."
@@ -90,7 +87,6 @@ else
     info "Docker already installed: $(docker --version)"
 fi
 
-# Docker Compose Installation
 info "Checking Docker Compose installation..."
 if ! command_exists docker-compose; then
     info "Installing Docker Compose standalone..."
@@ -114,19 +110,15 @@ cd nodes.quip.network
 info "Configuring data/config.toml..."
 cp data/config.cpu.toml data/config.toml
 
-# Replace config values
 sed -i "s/node_name = \"my-cpu-node\"/node_name = \"$NODE_NAME\"/g" data/config.toml
 sed -i "s/secret = \"CHANGE_ME\"/secret = \"$SECRET\"/g" data/config.toml
 sed -i "s/# auto_mine = false/auto_mine = true/g" data/config.toml
 
-# Add public_host below port = 20049
 sed -i "/port = 20049/a public_host = \"$PUBLIC_IP\"" data/config.toml
 
 info "Setting up .env file..."
 cp env.example .env
 
-# === PERBAIKAN: Konfigurasi agar dashboard bisa diakses dari luar ===
-# 1. Ubah QUIP_HOSTNAME agar Caddy mendengarkan di semua interface di port 20080 (HTTP)
 sed -i 's/^QUIP_HOSTNAME=.*/QUIP_HOSTNAME=:20080/' .env
 
 # 2. Timpa Caddyfile dengan konfigurasi plain HTTP tanpa email / TLS
